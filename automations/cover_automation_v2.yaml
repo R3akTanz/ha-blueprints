@@ -143,6 +143,177 @@ blueprint:
               step: 1
               mode: slider
               unit_of_measurement: "%"
+    wakeup_section:
+      name: GoodMorning-Wecker
+      description: >
+        Ein Wecker für diesen Rollladen mit zwei Weck-Zeiten: einer für Wochentage
+        (Mo-Fr, ohne gesetzliche Feiertage) und einer für Wochenende und
+        Feiertage. Zur jeweiligen Weck-Zeit fährt der Rollladen auf die
+        gewünschte Position (z.B. 30 % für sanftes Tageslicht) und der
+        Nachtmodus wird ausgeschaltet. Das normale morgendliche Öffnen
+        bleibt davon unberührt — es fährt später wie gewohnt weiter auf, falls
+        es aktiviert ist.
+
+        Jede Weck-Zeit lässt sich fest hier eintragen ODER über einen
+        input_datetime-Helfer im Dashboard ändern (der Helfer hat Vorrang,
+        solange er eine gültige Uhrzeit hat). Zusätzlich kann der Wecker an einen
+        Handy-Wecker gekoppelt werden.
+
+        Sturmschutz (kein Öffnen bei Starkwind), Frostschutz (Begrenzung der
+        Position) und der Pausier-Helfer werden berücksichtigt. Fährt der
+        Wecker deswegen nicht, kommt auf Wunsch eine Meldung aufs Handy
+        (Geräte im Abschnitt "Benachrichtigungen").
+
+        Feiertage erkennt der Wecker über den Arbeitstag-Sensor der
+        Home-Assistant-Integration "Arbeitstag" (Workday): Dort stellst du Land
+        und Bundesland ein. Ohne diesen Sensor gelten nur Samstag und Sonntag
+        als frei — Feiertage unter der Woche werden dann NICHT erkannt.
+
+        Nachtmodus: Ausgeschaltet wird der Helfer aus dem Abschnitt
+        "Nachtmodus" DIESER Automation — und nur, wenn es ein input_boolean ist
+        (bei Zeitplan/Binärsensor fährt der Rollladen trotzdem, der Helfer
+        bleibt unverändert). Für raumweise Wecker pro Raum einen eigenen
+        Nachtmodus-Helfer verwenden; wer denselben Helfer teilt, schaltet ihn
+        für alle gemeinsam aus — und löst dort das "Nachtmodus-Ende"-Öffnen der
+        morgendlichen Funktion aus (sofern deren Uhrzeit bzw. Sonnenaufgang
+        schon erreicht ist).
+      icon: mdi:alarm
+      collapsed: true
+      input:
+        wakeup_enabled:
+          name: GoodMorning-Wecker aktivieren
+          default: false
+          selector:
+            boolean: {}
+        wakeup_time_weekday:
+          name: Weck-Zeit Wochentag
+          description: >
+            Uhrzeit für Montag bis Freitag, sofern der Tag kein gesetzlicher
+            Feiertag ist. Wird ignoriert, solange unten ein gültiger Helfer
+            für die Wochentag-Zeit gewählt ist.
+          default: "07:00:00"
+          selector:
+            time: {}
+        wakeup_time_weekday_helper:
+          name: Weck-Zeit Wochentag per Helfer (optional)
+          description: >
+            Ein input_datetime-Helfer mit der Wochentag-Weck-Zeit, damit sie
+            im Dashboard änderbar ist. Wichtig: ein Helfer, der NUR eine Uhrzeit
+            enthält (ohne Datum) — ein Datum+Uhrzeit-Helfer feuert nur ein
+            einziges Mal. Hat Vorrang vor der festen Uhrzeit oben, solange er
+            verfügbar ist; sonst gilt die feste Uhrzeit. Leer lassen = feste
+            Uhrzeit.
+          default: []
+          selector:
+            entity:
+              domain: input_datetime
+        wakeup_time_free:
+          name: Weck-Zeit Wochenende & Feiertage
+          description: >
+            Uhrzeit für Samstag, Sonntag und gesetzliche Feiertage. Wird
+            ignoriert, solange unten ein gültiger Helfer für diese Zeit
+            gewählt ist.
+          default: "09:00:00"
+          selector:
+            time: {}
+        wakeup_time_free_helper:
+          name: Weck-Zeit Wochenende & Feiertage per Helfer (optional)
+          description: >
+            Wie oben, nur für Wochenende und Feiertage: ein input_datetime-Helfer
+            NUR mit Uhrzeit. Leer lassen = feste Uhrzeit.
+          default: []
+          selector:
+            entity:
+              domain: input_datetime
+        wakeup_workday_sensor:
+          name: Arbeitstag-Sensor für Feiertage (optional)
+          description: >
+            Ein binary_sensor der Integration "Arbeitstag" (Workday), z.B.
+            binary_sensor.workday_sensor. "An" = Arbeitstag, "Aus" = freier
+            Tag (Wochenende oder Feiertag). Land und Bundesland stellst du in
+            der Integration ein; die dort gewählten Arbeitstage sollten
+            Montag bis Freitag sein. Leer lassen = nur Samstag/Sonntag sind frei,
+            Feiertage unter der Woche werden nicht erkannt.
+          default: []
+          selector:
+            entity:
+              filter:
+                - domain: binary_sensor
+                  integration: workday
+        wakeup_phone_sensor:
+          name: Handy-Wecker-Sensor (optional)
+          description: >
+            Ein Sensor mit dem Zeitpunkt des nächsten Handy-Weckers (Geräteklasse
+            Zeitstempel), z.B. der Sensor "Nächster Wecker" der Home-Assistant
+            Companion App für Android. Der Rollladen fährt dann zum Zeitpunkt
+            des Handy-Weckers (abzüglich der Vorlaufzeit unten) — zusätzlich zu den
+            festen Zeiten, außer "Nur Handy-Wecker" ist aktiv. Das Auslösen ist
+            auf etwa eine Minute genau. Leer lassen, solange es keinen solchen
+            Sensor gibt.
+          default: []
+          selector:
+            entity:
+              filter:
+                - domain: sensor
+                  device_class: timestamp
+        wakeup_phone_offset:
+          name: Vorlaufzeit vor dem Handy-Wecker
+          description: >
+            So viele Minuten VOR dem Handy-Wecker fährt der Rollladen auf
+            (0 = genau zum Weckzeitpunkt).
+          default: 0
+          selector:
+            number:
+              min: 0
+              max: 120
+              step: 5
+              mode: slider
+              unit_of_measurement: min
+        wakeup_phone_only:
+          name: Nur Handy-Wecker verwenden
+          description: >
+            Wenn aktiviert UND ein Handy-Wecker-Sensor gewählt ist, werden die
+            festen Weck-Zeiten und Helfer-Zeiten ignoriert. Ist gerade kein
+            Handy-Wecker gestellt, wird dann gar nicht geweckt. Ohne gewählten
+            Sensor hat diese Option keine Wirkung.
+          default: false
+          selector:
+            boolean: {}
+        wakeup_position:
+          name: Position beim Wecken
+          description: >
+            Die Position (in %), auf die der Rollladen zur Weck-Zeit fährt.
+            Es wird nur aufgefahren: ist der Rollladen bereits offener als
+            dieser Wert, bleibt er unverändert. Bei Frost wird die Position
+            durch die Frostschutz-Grenze begrenzt.
+          default: 50
+          selector:
+            number:
+              min: 1
+              max: 100
+              step: 1
+              mode: slider
+              unit_of_measurement: "%"
+        wakeup_disable_night:
+          name: Nachtmodus beim Wecken ausschalten
+          description: >
+            Schaltet den Nachtmodus-Helfer (Abschnitt "Nachtmodus") zur
+            Weck-Zeit aus. Funktioniert nur bei einem input_boolean.
+          default: true
+          selector:
+            boolean: {}
+        wakeup_notify_failure:
+          name: Benachrichtigung, wenn der Wecker nicht fährt
+          description: >
+            Sendet eine Meldung an die Geräte aus dem Abschnitt
+            "Benachrichtigungen", wenn der Wecker wegen Sturm, Pause oder einem
+            nicht erreichbaren Rollladen nicht fahren konnte. Der Schlafmodus-Helfer
+            unterdrückt diese Meldung bewusst nicht. Ohne eingetragene
+            Benachrichtigungs-Geräte passiert nichts.
+          default: true
+          selector:
+            boolean: {}
+
     window_interaction_section:
       name: Fenster-Interaktion
       description: Wie der Rollladen auf geöffnete oder gekippte Fenster reagiert.
@@ -684,8 +855,13 @@ blueprint:
             Binärsensor (z.B. ein Template-Sensor "Sonne unter Horizont" für
             das Schließen bei Sonnenuntergang). Endet der Nachtmodus, wird ein
             von ihm blockiertes morgendliches Öffnen (Uhrzeit/Sonnenaufgang)
-            nachgeholt. Leer lassen, wenn kein Nachtmodus gewünscht ist. In
-            allen Blueprint-Instanzen dieselbe Entität auswählen.
+            nachgeholt. Leer lassen, wenn kein Nachtmodus gewünscht ist.
+            Der Helfer wird NICHT im Blueprint gespeichert, sondern ist eine
+            normale Entität in Home Assistant, die du hier pro Automation
+            auswählst: einen gemeinsamen Helfer für alle Rollläden eintragen
+            (alle schließen gleichzeitig) ODER pro Raum einen eigenen anlegen
+            (z.B. "Nachtmodus Schlafzimmer") und ihn in allen Rollladen-
+            Automationen dieses Raums auswählen.
           default: []
           selector:
             entity:
@@ -950,6 +1126,14 @@ variables:
   morning_sun_offset: !input morning_sun_offset
   morning_motion_sensor: !input morning_motion_sensor
   morning_position: !input morning_position
+  wakeup_position: !input wakeup_position
+  wakeup_disable_night: !input wakeup_disable_night
+  wakeup_workday_sensor: !input wakeup_workday_sensor
+  wakeup_time_weekday_helper: !input wakeup_time_weekday_helper
+  wakeup_time_free_helper: !input wakeup_time_free_helper
+  wakeup_phone_sensor: !input wakeup_phone_sensor
+  wakeup_phone_only: !input wakeup_phone_only
+  wakeup_notify_failure: !input wakeup_notify_failure
   night_mode_boolean: !input night_mode_boolean
   night_position: !input night_position
   night_ventilation_position: !input night_ventilation_position
@@ -1028,6 +1212,8 @@ variables:
 # Trigger, damit nicht jede Notification-Action jeder Instanz einen Lauf startet
 trigger_variables:
   window_sensor_tv: !input window_sensor
+  wakeup_phone_sensor_tv: !input wakeup_phone_sensor
+  wakeup_phone_offset_tv: !input wakeup_phone_offset
 
 triggers:
   - trigger: time
@@ -1051,6 +1237,42 @@ triggers:
     to: "on"
     id: morning_motion
     enabled: !input morning_enabled
+  # GoodMorning-Wecker: feste Uhrzeit und optionaler Helfer sind getrennte
+  # Trigger (leerer Helfer = Trigger ist valide und feuert nie). Welcher davon
+  # zählt, entscheidet die Bedingung im Wecker-Branch.
+  - trigger: time
+    at: !input wakeup_time_weekday
+    id: wakeup_weekday
+    enabled: !input wakeup_enabled
+  - trigger: time
+    at: !input wakeup_time_weekday_helper
+    id: wakeup_weekday_helper
+    enabled: !input wakeup_enabled
+  - trigger: time
+    at: !input wakeup_time_free
+    id: wakeup_free
+    enabled: !input wakeup_enabled
+  - trigger: time
+    at: !input wakeup_time_free_helper
+    id: wakeup_free_helper
+    enabled: !input wakeup_enabled
+  # Handy-Wecker: Template-Trigger statt "time" mit Entität, weil die
+  # Vorlaufzeit ein Eingabewert ist und "at: {entity_id, offset}" weder
+  # einen leeren Sensor noch einen eingegebenen Offset zulässt. Feuert beim
+  # Wechsel auf "wahr" (Weckzeit minus Vorlauf erreicht); das Template wird
+  # durch now() minütlich neu bewertet.
+  - trigger: template
+    value_template: >-
+      {% if wakeup_phone_sensor_tv is string
+            and has_value(wakeup_phone_sensor_tv) %}
+        {% set alarm_ts = as_timestamp(states(wakeup_phone_sensor_tv), 0) %}
+        {{ alarm_ts > 0
+           and now().timestamp() >= alarm_ts - (wakeup_phone_offset_tv | int(0)) * 60 }}
+      {% else %}
+        false
+      {% endif %}
+    id: wakeup_phone
+    enabled: !input wakeup_enabled
   - trigger: state
     entity_id: !input window_sensor
     to:
@@ -1155,11 +1377,15 @@ triggers:
     enabled: !input mosquito_enabled
 
 actions:
-  # Pausier-Helfer: hält die AUTOMATIK an, mit drei Ausnahmen — Sturmschutz
-  # (Hardware-Schutz geht vor), Benachrichtigungs-Aufräumen (bewegt nichts) und
+  # Pausier-Helfer: hält die AUTOMATIK an, mit vier Ausnahmen — Sturmschutz
+  # (Hardware-Schutz geht vor), Benachrichtigungs-Aufräumen (bewegt nichts),
   # der Notification-Knopf (ein bewusster Nutzer-Befehl, wie der Wandtaster)
+  # und der Wecker (wird hier durchgelassen, damit er eine Pause per Meldung
+  # melden kann — bewegt wird bei Pause trotzdem nichts, siehe Wecker-Branch)
   - condition: >-
-      {{ trigger.id | default('') in ['storm_detected', 'window_closed', 'close_shutter_action']
+      {{ trigger.id | default('') in ['storm_detected', 'window_closed', 'close_shutter_action',
+                                      'wakeup_weekday', 'wakeup_weekday_helper',
+                                      'wakeup_free', 'wakeup_free_helper', 'wakeup_phone']
          or not pause_active }}
   - choose:
       # --- MORGENS ÖFFNEN (Uhrzeit, Sonnenaufgang oder Bewegung) ---
@@ -1283,6 +1509,160 @@ actions:
                   entity_id: "{{ 'scene.reclose_' ~ (cover_entity | slugify) }}"
           # Morgens-Öffnen ist für die Beschattung eine Fremdbewegung: Status freigeben,
           # damit ein heißer Sommermorgen direkt wieder frisch beschattet werden kann
+          - if:
+              - "{{ shading_status_helper is string and is_state(shading_status_helper, 'on') }}"
+            then:
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: "{{ shading_status_helper }}"
+
+      # --- GOODMORNING-WECKER ---
+      - conditions:
+          - condition: trigger
+            id:
+              - wakeup_weekday
+              - wakeup_weekday_helper
+              - wakeup_free
+              - wakeup_free_helper
+              - wakeup_phone
+          # Welcher Trigger zählt? Handy-Wecker immer. Feste Uhrzeit und
+          # Helfer-Zeit nur, wenn nicht "Nur Handy-Wecker" gilt; die
+          # Wochentag-Zeit nur an einem Arbeitstag (Mo-Fr, laut Workday-Sensor
+          # kein Feiertag), die andere Zeit an allen übrigen Tagen. Ist der
+          # Workday-Sensor nicht gesetzt oder nicht erreichbar, zählen nur
+          # Samstag/Sonntag als frei. Ein gültiger Helfer (Uhrzeit vorhanden)
+          # hat Vorrang vor der festen Uhrzeit; ist er nicht verfügbar, greift
+          # die feste Uhrzeit als Rückfall.
+          - >-
+            {% set tid = trigger.id %}
+            {% if tid == 'wakeup_phone' %}
+              true
+            {% elif wakeup_phone_only and wakeup_phone_sensor is string %}
+              false
+            {% else %}
+              {% set sensor_ok = wakeup_workday_sensor is string
+                                 and states(wakeup_workday_sensor) in ['on', 'off'] %}
+              {% set workday = now().weekday() < 5
+                               and (not sensor_ok or is_state(wakeup_workday_sensor, 'on')) %}
+              {% set is_wd = tid.startswith('wakeup_weekday') %}
+              {% set is_helper = tid.endswith('_helper') %}
+              {% set helper = wakeup_time_weekday_helper if is_wd else wakeup_time_free_helper %}
+              {% set helper_ok = helper is string
+                                 and has_value(helper)
+                                 and state_attr(helper, 'has_time') == true %}
+              {{ (workday if is_wd else not workday)
+                 and (helper_ok if is_helper else not helper_ok) }}
+            {% endif %}
+        sequence:
+          - variables:
+              # Position VOR dem Ausschalten des Nachtmodus merken (-1 = Cover
+              # ohne Positionsangabe). Das Ausschalten kann in dieser Instanz
+              # das "Nachtmodus-Ende"-Öffnen auslösen; die Entscheidung "nur
+              # auffahren" soll sich aber auf den Zustand beim Wecken beziehen.
+              pos_before: "{{ state_attr(cover_entity, 'current_position') | int(-1) }}"
+              wind_now: >-
+                {% if storm_wind_sensor is string %}
+                  {{ states(storm_wind_sensor) | float(0) }}
+                {% elif weather_entity is string %}
+                  {{ state_attr(weather_entity, 'wind_speed') | float(0) }}
+                {% else %}
+                  0
+                {% endif %}
+              # Frostschutz: Aufwärtsfahrt bei Frost auf die schonende
+              # Maximal-Position begrenzen (festgefrorener Panzer)
+              wakeup_target: >-
+                {% if frost_active %}
+                  {{ [wakeup_position | int(50), frost_max_position | int(100)] | min }}
+                {% else %}
+                  {{ wakeup_position | int(50) }}
+                {% endif %}
+              # Grund, warum NICHT gefahren wird ('' = alles in Ordnung).
+              # Pause hat Vorrang: dann wird auch der Nachtmodus nicht angefasst.
+              wake_block: >-
+                {{ 'pause' if pause_active else
+                   'unavailable' if not has_value(cover_entity) else
+                   'storm' if (storm_enabled and (wind_now | float(0)) >= wind_speed_threshold) else '' }}
+          # Nachtmodus ausschalten (nur input_boolean lässt sich schalten;
+          # nicht bei Pause). Das kurze Delay lässt ein dadurch ausgelöstes
+          # "Nachtmodus-Ende"-Öffnen dieser Instanz zuerst durchlaufen — die
+          # Weck-Position gewinnt danach.
+          - if:
+              - >-
+                {{ wakeup_disable_night
+                   and wake_block != 'pause'
+                   and night_mode_boolean is string
+                   and night_mode_boolean.startswith('input_boolean.')
+                   and is_state(night_mode_boolean, 'on') }}
+            then:
+              - action: input_boolean.turn_off
+                target:
+                  entity_id: "{{ night_mode_boolean }}"
+              - delay:
+                  seconds: 3
+          # Wecker kann nicht fahren (Pause, Sturm, Rollladen nicht erreichbar):
+          # Meldung senden und beenden. Sturm hat immer Vorrang — bei Starkwind
+          # wird nicht geöffnet.
+          - if:
+              - "{{ wake_block != '' }}"
+            then:
+              - if:
+                  - "{{ wakeup_notify_failure }}"
+                  - "{{ device_name_map | length > 0 }}"
+                then:
+                  - variables:
+                      fail_text: >-
+                        {% if wake_block == 'pause' %}
+                          Die Automatik ist pausiert.
+                        {% elif wake_block == 'storm' %}
+                          Der Sturmschutz ist aktiv (Wind {{ wind_now | float(0) | round(0) }} km/h).
+                        {% else %}
+                          Der Rollladen ist nicht erreichbar.
+                        {% endif %}
+                      cover_label: "{{ state_attr(cover_entity, 'friendly_name') or cover_entity }}"
+                  - repeat:
+                      for_each: "{{ device_name_map }}"
+                      sequence:
+                        # Ein einzelnes umbenanntes/entferntes Gerät darf den
+                        # Versand an die übrigen Geräte nicht abbrechen
+                        - action: "notify.{{ repeat.item }}"
+                          continue_on_error: true
+                          data:
+                            title: GoodMorning-Wecker
+                            message: >-
+                              {{ cover_label }}: Der Wecker um {{ now().strftime('%H:%M') }} Uhr
+                              wurde nicht ausgeführt. {{ fail_text }}
+                            data:
+                              # Gleicher Tag pro Rollladen: ersetzt eine ältere
+                              # Fehlermeldung statt sie zu stapeln
+                              tag: "{{ 'wakeup_fehler_' ~ (cover_entity | slugify) }}"
+              - stop: "{{ 'Wecker nicht ausgeführt: ' ~ wake_block }}"
+          - choose:
+              - conditions:
+                  - "{{ pos_before | int(-1) >= 0 }}"
+                  - "{{ pos_before | int(-1) < wakeup_target | int(50) }}"
+                sequence:
+                  - action: cover.set_cover_position
+                    target:
+                      entity_id: !input cover
+                    data:
+                      position: "{{ wakeup_target }}"
+              # Fallback für Cover ohne Positions-Attribut
+              - conditions:
+                  - "{{ pos_before | int(-1) < 0 }}"
+                sequence:
+                  - action: cover.open_cover
+                    target:
+                      entity_id: !input cover
+          # Veralteten Lüftungs-Snapshot aus der Nacht verwerfen (wie beim
+          # morgendlichen Öffnen), sonst würde das Fenster-Zurückfahren den
+          # Rollladen später wieder auf die alte Nacht-Position ziehen
+          - if:
+              - "{{ expand('scene.reclose_' ~ (cover_entity | slugify)) | count > 0 }}"
+            then:
+              - action: scene.delete
+                target:
+                  entity_id: "{{ 'scene.reclose_' ~ (cover_entity | slugify) }}"
+          # Wecken ist für die Beschattung eine Fremdbewegung: Status freigeben
           - if:
               - "{{ shading_status_helper is string and is_state(shading_status_helper, 'on') }}"
             then:
